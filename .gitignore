@@ -12,6 +12,7 @@ artifacts/
 # Local notes and documentation (keep on disk, out of the code repository)
 *.md
 *.markdown
+!/README.md
 docs/
 
 # Private keys, credentials, and local exports
