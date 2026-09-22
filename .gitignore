@@ -1,0 +1,46 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+credentials/
+*.credentials.json
+.DS_Store
+coverage/
+artifacts/
+
+# Local notes and documentation (keep on disk, out of the code repository)
+*.md
+*.markdown
+docs/
+
+# Private keys, credentials, and local exports
+secrets/
+private/
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*service_account*.json
+# Google downloaded key filenames end in the 12-character key identifier
+*-????????????.json
+*.csv
+*.tsv
+*.xlsx
+*.sqlite
+*.sqlite3
+*.db
+
+# Local tooling, logs, and generated output
+.codex/
+.agents/
+.vscode/
+.idea/
+*.log
+*.tsbuildinfo
+.tmp/
+tmp/
+.cache/
+playwright-report/
+test-results/

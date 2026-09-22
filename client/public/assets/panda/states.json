@@ -1,0 +1,7 @@
+{
+  "idle": { "type": "idle-sprite", "src": "/assets/panda/typing-blink-v1.png" },
+  "typing": { "type": "idle-sprite", "src": "/assets/panda/typing-blink-v1.png" },
+  "listening": { "type": "idle-sprite", "src": "/assets/panda/typing-blink-v1.png" },
+  "thinking": { "type": "idle-sprite", "src": "/assets/panda/typing-blink-v1.png" },
+  "speaking": { "type": "idle-sprite", "src": "/assets/panda/typing-blink-v1.png" }
+}
