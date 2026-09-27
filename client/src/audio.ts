@@ -97,7 +97,7 @@ export class AudioEngine {
       this.remoteAnalyser = meter;
     }
   }
-  play(blob: Blob) {
+  play(blob: Blob, timeoutMs = 15000) {
     this.stop();
     return new Promise<void>((resolve, reject) => {
       const url = URL.createObjectURL(blob);
@@ -112,7 +112,7 @@ export class AudioEngine {
       };
       const timer = setTimeout(
         () => finish(Error("Greeting playback timed out")),
-        15000,
+        timeoutMs,
       );
       this.cancelPlayback = () => finish();
       this.greeting.onended = () => finish();

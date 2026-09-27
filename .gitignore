@@ -45,3 +45,7 @@ tmp/
 .cache/
 playwright-report/
 test-results/
+
+.local-data/
+*.sqlite-wal
+*.sqlite-shm

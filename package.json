@@ -10,9 +10,11 @@
     "build": "npm run typecheck && vite build --config client/vite.config.ts && tsc -p server/tsconfig.json",
     "start": "node dist/server/src/index.js",
     "smoke": "npm run build && node scripts/smoke.mjs",
-    "format": "prettier --write client/src server/src shared tests docs README.md"
+    "format": "prettier --write client/src server/src shared tests docs README.md",
+    "desktop": "npm run build && electron desktop/main.cjs"
   },
   "dependencies": {
+    "discord.js": "^14.22.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
@@ -31,10 +33,14 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
+    "electron": "^44.4.5",
     "prettier": "^3.9.8",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.4",
     "vitest": "^3.1.2"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

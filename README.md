@@ -1,34 +1,128 @@
 # P.A.N.D.A.
 
-Aggie Data Science Club's voice mascot: personalized welcomes, spoken Q&A, an animated panda, and captions. Run it locally on the laptop connected to your projector. Internet is needed for voice and live data.
+ADSC’s animated workshop mascot. Members submit questions in Discord, officers approve them, and the presenter chooses when Panda reads them aloud. Google Forms greetings remain available before the lecture.
 
-## 1. Download and install
+This first desktop build runs locally on **macOS with Node.js 22.13 or newer**. It opens an operator console and a floating Panda overlay. No hosting subscription is needed; keep the laptop awake and online for Discord. Native Mac speech has no API charge. OpenAI speech, greetings, and optional AI drafts use your own billed API key.
 
-Install **Node.js 22 or newer** (includes npm). Clone this repository or download its ZIP and extract it. Open a terminal in the project folder, then run:
+## Install and launch
+
+Clone or download this repository, open a terminal in its folder, then:
 
 ```sh
 npm ci
 cp .env.example .env
+npm run desktop
 ```
 
-On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
+**Keep an existing `.env`; do not overwrite it.** `npm run desktop` builds the code and starts Electron plus the local server. Quit the app before rebuilding. This is a development desktop build, not a packaged installer yet.
 
-## 2. Add your configuration
+For browser development use `npm run dev`, then open `http://localhost:5173/workshop`. A browser preview cannot float over other apps. `npm run build` followed by `npm start` serves the built browser version at `http://localhost:3001/workshop`.
 
-Open `.env` in your editor. This is a local file and is excluded from Git.
+## Try it without Discord or paid keys
 
-| Setting | What you need |
-| --- | --- |
-| `OPENAI_API_KEY` | An OpenAI API project key with billing and access to the configured models. Required for voice greetings and Q&A. A ChatGPT subscription alone does not supply API credit. |
-| `DEMO_MODE` | Keep `true` to try fictional members without connecting Google. Use `false` for the club's real sign-ins. |
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | For live data: the absolute path to a Google service-account JSON credential on your computer. |
-| `PRIVATE_SPREADSHEET_ID` | For live data: the private workbook ID, found between `/d/` and `/edit` in its URL. |
-| `SESSION_ID` | For live data: must exactly match `session_id` in the workbook's `Config` tab. |
-| `GITHUB_TOKEN` | Optional, for authenticated public GitHub API reads. Leave blank and set `ENABLE_GITHUB_ENRICHMENT=false` if you do not need GitHub enrichment. |
+1. Keep `DEMO_MODE=true` and `ENABLE_DISCORD_QA=false` in `.env`.
+2. Run `npm run desktop`. Click **Start workshop**.
+3. On the Panda window, click **Enable playback**. Drag Panda itself to move it. Hover over Panda for **− / +** size buttons, or use **Smaller / Larger** in the admin panel. Transparent space passes clicks through to the presentation.
+4. Expand **Test without Discord**, add a question, then **Approve** it. Nothing should play yet.
+5. Click **Start lecture**. Select **Mac system voice**, then **Read next question**.
+6. After Panda finishes, the question becomes **read**. Answer it yourself and click **Mark answered**.
 
-Keep the remaining defaults initially. `REALTIME_MODEL` handles spoken Q&A, `TTS_MODEL` handles greetings, and `WEB_SEARCH_MODEL` handles optional current-information searches. Set `ENABLE_WEB_SEARCH=false` if you do not need search. Use lowercase `true` and `false` for boolean settings.
+**Stop speaking** interrupts the current question; **Queue again** makes it eligible for another explicit release. Only one question plays at a time. Ending, replacing, or restarting a workshop marks pending, approved, playing, and interrupted questions **Workshop ended**. Their cards stay in history, but cannot be approved or replayed. Click **Start workshop** for a fresh queue; reopening old workshops is no longer needed. Read, answered, and denied history is preserved.
 
-For a quick voice demo, only fill in `OPENAI_API_KEY`, keep `DEMO_MODE=true`, and disable the optional integrations if unused. Without an OpenAI key, you can still preview animations and visual welcomes.
+## Discord setup
+
+Use a separate test bot if you cannot change the officer’s existing application or another process is using it. A token shared in chat should be replaced by the bot owner. Put tokens directly in your local `.env`, never in Discord messages or source files.
+
+### Create or reuse the application
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications). Create an application named P.A.N.D.A. Test, or open the officer’s application if you have access.
+2. Copy its **Application ID** from **General Information**. Under **Bot**, obtain/reset its token and paste it directly into `.env`.
+3. This app receives interactions through Discord’s Gateway. Leave **Interactions Endpoint URL** empty. If an existing bot needs its HTTP endpoint or existing `/ask` command, create a separate bot instead. Stop any other process running this same bot.
+4. Install the bot into the ADSC server using a **Guild Install** link with `bot` and `applications.commands` scopes. In the question channel, grant it **View Channel**, **Send Messages**, **Embed Links**, and **Read Message History**. Server installation requires an authorized server member. Administrator permission is unnecessary.
+5. No privileged intents are needed (including for commands-only cleanup): leave **Message Content**, **Server Members**, and **Presence** intents off. Members need access to the question channel and **Use Application Commands** permission.
+6. In Discord, enable **User Settings → Advanced → Developer Mode**. Right-click the server and question channel to copy their IDs. Under server roles, copy the officer role ID. Anyone approving in Discord must actually have that role.
+
+Fill these local settings (a new bot requires its own application ID and token):
+
+```dotenv
+ENABLE_DISCORD_QA=true
+DISCORD_BOT_TOKEN=your_token_here
+DISCORD_APPLICATION_ID=your_application_id
+DISCORD_GUILD_ID=your_server_id
+DISCORD_QUESTION_CHANNEL_ID=your_question_channel_id
+DISCORD_MODERATOR_ROLE_IDS=your_officer_role_id
+DISCORD_MODERATION_CHANNEL_ID=
+DISCORD_COMMANDS_ONLY=false
+```
+
+Multiple moderator role IDs can be comma-separated. The optional moderation channel must be private to officers and accessible to the bot; it receives review cards. Without it, officers use `/review` for private approval buttons, or approve in the local console. Ordinary channel messages are not ingested: members use `/ask`.
+
+### Connect and verify
+
+1. Restart the app after editing `.env`. Click **Connect**, then **Update commands**. Registration also adds `/review`. Other commands are preserved; a conflicting existing command is refused.
+2. Start a workshop. In the configured channel, run `/ask` and fill in its inline fields: `question`, `name`, and optional `anonymous`. Name and question are required. Set anonymous to Yes to keep your entered name out of spoken playback; your Discord account is still visible on the public card. Expect a short private confirmation, a public question card marked **Pending approval**, and a pending item in the console.
+3. As an officer, run `/review` and approve it. Each question has its own **Approve**, **Deny**, and **Manual answer** controls where applicable. Up to ten reviewable questions are shown at a time; run the command again after reviewing those to see more. Check that the original public card changes to **Approved** without speaking. The card stays in channel history and also reflects later playback/answered status. Desktop-console reviews update it within about five seconds. A member without the configured role must be denied approval access.
+4. Enable overlay playback, switch to lecture, and click **Read next question**. Panda should announce the submitted name and read the question, without generating an answer.
+5. Test **Deny**, **Stop speaking**, **Queue again**, and **End workshop**. After ending, `/ask` must say no workshop is active. Restart once and reconnect Discord to confirm old unfinished cards become **Workshop ended**.
+
+If `/ask` is missing, check the application/server IDs, installation scopes, registration result, and channel command permissions. Reopen Discord if necessary. If it times out, confirm this laptop is online, the console says connected, and no competing bot process or HTTP interaction endpoint is handling it.
+
+### Upgrading an existing bot
+
+Quit the desktop app, run `npm run desktop`, **Connect**, then click **Update commands** once. This updates `/ask` with inline fields and replaces this app’s old `/panda-review` with `/review`. Unrelated commands are preserved. If Discord still shows the old fields, dismiss the command picker and reopen Discord.
+
+Public card headings use the entered name (for example, **Anshul asked**), or **Anonymous asked** when anonymous is selected. The authenticated Discord account stays tagged underneath. Officer review cards also show the entered name and question. `anonymous: true` hides the entered name from the public card and **spoken playback**: Panda says “A member asks…”; otherwise it reads the entered name. Existing question records are preserved; public cards are created for new Discord submissions after this update.
+
+### Reply manually as an officer
+
+Run `/review`, find the question, and click **Manual answer**. Enter up to 1,500 characters and submit. The bot posts your response in the question channel, credits your server display name (falling back to your Discord display name or username) without mentioning you, tags only the asker, and marks the question **Answered**, removing it from the speech queue. These bot messages survive commands-only cleanup. Pending, approved, read, and interrupted questions can be answered; a question currently playing cannot.
+
+Officer permissions are checked again when submitting the response. Answers are saved locally and delivery retries if Discord is unavailable. This is a written response, not TTS. Existing public question headings refresh when the upgraded bot connects. `/ask` keeps the order **question → name → anonymous**.
+
+### Keep the channel for questions
+
+Discord requires members to have both **Send Messages** and **Use Application Commands** for slash commands ([Discord’s explanation](https://github.com/discord/discord-api-docs/discussions/5097)). Keep those enabled, along with **View Channel** and **Read Message History**.
+
+To remove ordinary messages automatically:
+
+1. Give the bot **Manage Messages** in this question channel.
+2. Add `DISCORD_COMMANDS_ONLY=true` to `.env` and restart/reconnect.
+3. Test with an ordinary member: `/ask` should work and a regular message should be removed. Cleanup applies to new human messages in this channel, including officers; bot cards are preserved. It needs the bot online, may briefly show messages before removing them, and does not erase old history.
+
+No Message Content intent is needed. To disable cleanup, set the option to `false` and restart. You can additionally restrict other apps’ commands under **Server Settings → Integrations**.
+
+Suggested channel topic (or pin a message before enabling cleanup):
+
+> Workshop questions: use /ask and fill in your question. Enter your name; choose anonymous: Yes if you do not want it read aloud. Your Discord account remains visible. Officers: use /review to approve or deny. Question cards show their status here. Please keep general chat in the other channels.
+
+Pending questions are public before review, as requested. Denying one marks its card **Not approved**; it does not remove its text. Officers can delete inappropriate cards using Discord’s normal moderation controls.
+
+### Pause questions and prevent spam
+
+Starting a workshop opens question submissions; ending it, restarting the server, or reaching the six-hour expiry closes them. Officers can use `/review action:lock` or `/review action:unlock` during an active workshop. The desktop console also has **Lock questions / Unlock questions**. This pauses `/ask` intake; it does not change Discord channel permissions or interrupt a question already playing. Officers can still review the existing queue while intake is paused. Unlocking cannot start an inactive workshop remotely.
+
+Each Discord account can submit at most once every 15 seconds and hold at most three pending/approved questions. Names and questions are length-limited, normalized, and checked for common profanity. Name fields reject URLs, mentions, and non-name punctuation. This basic filter cannot detect every offensive phrase or disguised spelling; officers still decide what gets read. Public cards escape formatting and suppress notification mentions.
+
+When Panda is fully offline, Discord shows its own non-response error for `/ask`; custom replies require a running bot or hosted endpoint. Add “Panda is available only during workshops” to the channel topic.
+
+The connected bot can remain online between workshops while the desktop app runs, even with Panda hidden. Closed workshops reject new questions. Closing the app or sleeping/shutting down the laptop takes the bot offline; always-on availability would require a separate continuously running host.
+
+## Workshop routine
+
+1. Launch the app and start a new workshop. This starts greeting mode but does **not** change the Google Sheets session ID or attendance records.
+2. Enable playback on the overlay. Use **Next display** to place it on the projector. Rehearse with the actual slides in fullscreen before the audience arrives; display/Space behavior depends on the presentation setup.
+3. Connect Discord. Register commands only on first setup or after command changes.
+4. Use **Greeting settings** to check live sign-ins and greeting voices. Keep the old projector closed so it does not compete for audio ownership.
+5. Click **Start lecture**. Officers approve questions; the presenter releases them during pauses. Approval never interrupts the lecture.
+6. Click **End workshop** when finished. Unfinished public cards update to **Workshop ended** within about five seconds while connected. Sessions also expire after six hours. If the app crashes or quits before updating Discord, cards are repaired on the next app launch and bot connection; a stopped bot cannot update messages. Quit the app to disconnect the bot.
+
+Shortcuts: **⌘⇧P** shows/hides Panda; **⌘⇧O** opens the operator console. Hiding Panda does not stop speech; use **Stop speaking**. Audio uses the computer’s selected output device.
+
+## Optional OpenAI and Google configuration
+
+Set `OPENAI_API_KEY` for greetings, OpenAI question speech, or private AI drafts. A ChatGPT subscription does not supply API credit. Question speech uses `TTS_MODEL` and `TTS_VOICE`. The optional private draft panel supports model selection and web search; drafts are currently text-only and never posted to Discord. Model access depends on your API account.
+
+Keep `DEMO_MODE=true` for fictional sign-ins. For live greetings, use the existing club workbook:
 
 ### Connecting to the existing club Sheets setup
 
@@ -47,48 +141,10 @@ The existing workbook uses `Members`, `SessionSignIns`, and `EnrichmentCache`. T
 
 This assumes access to the club's existing workbook. A separate installation needs its own compatible Sheets/Form setup; simply linking an arbitrary spreadsheet will not work.
 
-## 3. Run locally
+## Maintenance
 
-For development and testing:
-
-```sh
-npm run dev
-```
-
-- Projector: **http://localhost:5173**
-- Admin: **http://localhost:5173/admin**
-
-Code changes reload automatically. Restart the command after changing `.env`. Stop it with **Ctrl+C**.
-
-For a workshop, stop the development server and run:
-
-```sh
-npm run build
-npm start
-```
-
-- Projector: **http://localhost:3001**
-- Admin: **http://localhost:3001/admin**
-
-This runs the built version. Repeat `npm run build` after code changes. The port does not select demo/live data; `DEMO_MODE` does.
-
-## 4. Start a session
-
-1. Open admin and projector in separate windows. Keep the projector window open.
-2. Click **Enable stage audio** on the projector. Allow microphone access in your browser (and your operating system if prompted).
-3. In admin, choose **Arrival mode**. For a demo, click **Simulate arrival**; for live use, submit the club's sign-in form.
-4. Switch to **Q&A mode**, wait for **Ready for a question**, and say: “Hi Panda, my code is Panda one. What project should I build?”
-5. Wait until Panda finishes before a follow-up. The microphone is temporarily disabled during its response.
-
-Greeting and Q&A voices can be changed in admin. Keep **Animation rehearsal → Automatic** during real use. Existing sign-ins load silently after a server restart; use **Greet attendee** or **Replay last welcome** to test again without resubmitting the form.
-
-## Troubleshooting and team changes
-
-- **No voice:** check the OpenAI key, API billing/model access, stage audio, and speaker output. Use **Reconnect voice** after fixing configuration.
-- **No microphone:** check browser/OS permissions and the selected input in admin.
-- **No live arrivals:** check `DEMO_MODE=false`, spreadsheet access, matching session ID, and the admin Sheets status.
-- **Port already in use:** stop the other local server before starting another copy.
-- **Changing personality:** edit `server/src/config/personality.ts` and reconnect voice. Greeting templates are in `shared/domain.ts`.
-- **Checking code changes:** run `npm test` and `npm run build`.
-
-Keep `.env`, Google credential JSON files, tokens, and member exports private. `.env.example` contains placeholders for sharing. Run the admin/projector locally; this app is not configured as a public, authenticated service.
+- Run `npm test` and `npm run build` to check changes. An experimental SQLite warning on Node 22 is expected.
+- Queue data lives in `.local-data/workshop.sqlite` (excluded from Git). Restart does not erase it. `PANDA_DATA_DIR` can select a different local folder.
+- `.env`, credentials, and local member data must stay private. Never expose this local operator server publicly.
+- The original projector (`/`) and admin (`/admin`) remain available for the earlier voice Q&A workflow.
+- This release keeps the existing Sheets setup. A guided per-workshop Form setup, grouped greetings, installer packaging, and further animation polish are follow-up work.

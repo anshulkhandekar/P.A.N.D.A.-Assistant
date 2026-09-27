@@ -1,3 +1,4 @@
+import { workshopRouter } from "./workshop.js";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { randomUUID } from "node:crypto";
@@ -369,11 +370,17 @@ app.post("/api/realtime/disconnect", requireOwner, async (_req, res) => {
   await realtime.disconnect();
   res.json({ ok: true });
 });
+app.use("/api/workshop", workshopRouter((phase) => {
+  controls = {...controls, mode: "arrival", micPaused: true, autoGreet: phase === "arrivals"};
+  if (phase !== "arrivals") { pending.clear(); emit("command", {action:"clear"}); }
+  void realtime.disconnect();
+  emit("controls", controls);
+}));
 app.use("/api", (_req, res) =>
   res.status(404).json({ error: "API route not found" }),
 );
 app.use(express.static(resolve("dist/client")));
-app.get(["/", "/admin"], (_req, res) =>
+app.get(["/", "/admin", "/workshop", "/overlay"], (_req, res) =>
   res.sendFile(resolve("dist/client/index.html")),
 );
 app.use(

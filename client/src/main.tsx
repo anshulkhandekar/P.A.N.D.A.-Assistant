@@ -1,3 +1,4 @@
+import { WorkshopConsole, WorkshopStage } from "./Workshop";
 import { greetingFor } from "../../shared/domain";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -8,7 +9,8 @@ import type { PandaState } from "../../shared/domain";
 import "./styles.css";
 const isAdmin = location.pathname === "/admin";
 if (!isAdmin) window.name = "panda-stage";
-const runtime = isAdmin ? null : new ProjectorRuntime();
+const workshopPage = ["/workshop", "/overlay"].includes(location.pathname);
+const runtime = isAdmin || workshopPage ? null : new ProjectorRuntime();
 const labels: Record<PandaState, string> = {
   idle: "Idle",
   typing: "Typing",
@@ -546,4 +548,4 @@ function Admin({ status }: { status: any }) {
     </main>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(location.pathname === "/workshop" ? <WorkshopConsole /> : location.pathname === "/overlay" ? <WorkshopStage /> : <App />);

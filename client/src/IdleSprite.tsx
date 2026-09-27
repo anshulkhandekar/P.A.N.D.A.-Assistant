@@ -8,12 +8,14 @@ export function IdleSprite({
   state,
   volume,
   greeting = false,
+  cutout = false,
   onError,
 }: {
   src: string;
   state: PandaState;
   volume: number;
   greeting?: boolean;
+  cutout?: boolean;
   onError: () => void;
 }) {
   const id = useId().replace(/:/g, "");
@@ -100,15 +102,20 @@ export function IdleSprite({
   const eyeFrame = reduced
     ? 0
     : blink || (smile && !pose.thinking ? 5 : pose.typing ? 3 : 0);
+  // Clip only the raster layers, leaving moving SVG limbs free to animate.
+  const silhouette = (frame: number) =>
+    `M83 347 L61 266 Q59 257 69 258 L116 258 ${frame === 4 ? "Q116 231 128 222 Q150 206 174 228 L179 222" : "Q117 234 139 229 Q155 225 170 231 L179 222"} Q133 204 138 179 Q140 164 155 154 Q154 124 170 94 Q135 87 146 54 Q155 30 180 26 Q208 21 229 45 L254 38 Q254 10 282 7 Q313 3 331 24 Q345 39 348 60 Q388 83 414 142 Q454 236 458 292 L458 338 Q481 334 484 357 Q484 382 463 392 L438 395 Q401 451 329 478 Q266 503 237 486 Q226 481 221 448 L133 473 Q104 482 83 469 Q62 450 53 419 Q44 391 52 372 Q60 354 83 347 Z`;
   const tile = (frame: number) => (
-    <image
-      href={src}
-      width={1536}
-      height={1024}
-      x={-(frame % 3) * 512}
-      y={-Math.floor(frame / 3) * 512}
-      onError={onError}
-    />
+    <g clipPath={cutout ? `url(#${id}-silhouette-${frame})` : undefined}>
+      <image
+        href={src}
+        width={1536}
+        height={1024}
+        x={-(frame % 3) * 512}
+        y={-Math.floor(frame / 3) * 512}
+        onError={onError}
+      />
+    </g>
   );
   const rightHand = (
     <g
@@ -128,7 +135,7 @@ export function IdleSprite({
   );
   return (
     <svg
-      viewBox="0 0 512 512"
+      viewBox={cutout ? "38 -4 460 506" : "0 0 512 512"}
       className={`idle-sprite rig-${greeting && !reduced ? "welcome" : pose.gesture} ${reduced ? "rig-reduced" : ""}`}
       role="img"
       aria-label={`ADSC panda ${state.replaceAll("_", " ")} at its laptop`}
@@ -136,6 +143,12 @@ export function IdleSprite({
       style={{ "--mouth-open": pose.mouthOpen } as CSSProperties}
     >
       <defs>
+        {cutout &&
+          Array.from({ length: 6 }, (_, frame) => (
+            <clipPath key={frame} id={`${id}-silhouette-${frame}`}>
+              <path d={silhouette(frame)} />
+            </clipPath>
+          ))}
         <mask
           id={`${id}-body`}
           maskUnits="userSpaceOnUse"

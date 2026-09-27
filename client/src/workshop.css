@@ -1,0 +1,178 @@
+.workshop-console {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  color: #243e30;
+}
+.workshop-console header span {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: #956047;
+}
+.workshop-console h1 {
+  font-size: 30px;
+  margin: 12px 0;
+}
+.workshop-console section {
+  background: #fffdf8;
+  border: 1px solid #e5e5d8;
+  border-radius: 18px;
+  padding: 24px;
+  margin: 20px 0;
+}
+.workshop-console h2 {
+  font-size: 23px;
+  margin-top: 0;
+}
+.workshop-console p {
+  line-height: 1.5;
+}
+.workshop-console label {
+  display: block;
+  margin: 12px 0;
+}
+.workshop-console input:not([type="checkbox"]),
+.workshop-console textarea,
+.workshop-console select {
+  display: block;
+  padding: 12px;
+  border: 1px solid #ccd4c9;
+  border-radius: 8px;
+  background: white;
+  color: #243e30;
+  max-width: 100%;
+  font: inherit;
+}
+.workshop-console textarea {
+  width: 100%;
+  min-height: 90px;
+  box-sizing: border-box;
+}
+.workshop-console button {
+  background: #324e3b;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.workshop-console button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.workshop-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0;
+}
+.question-card {
+  border-top: 1px solid #ddd;
+  padding: 18px 0;
+}
+.question-status {
+  margin-left: 12px;
+  color: #956047;
+}
+.question-card small {
+  color: #687667;
+}
+.draft-answer {
+  white-space: pre-wrap;
+}
+.workshop-error {
+  background: #fce9e1;
+  color: #863c25;
+  padding: 12px;
+  border-radius: 8px;
+}
+html:has(.overlay-body),
+.overlay-body {
+  background: transparent !important;
+  margin: 0;
+  overflow: hidden;
+}
+.workshop-stage {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.overlay-panda {
+  width: 240px;
+  height: 240px;
+  position: relative;
+  -webkit-app-region: drag;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+.overlay-panda svg {
+  width: 100%;
+  height: 100%;
+}
+.overlay-caption {
+  background: #fffaf2f5;
+  border-left: 4px solid #ba7655;
+  border-radius: 15px;
+  padding: 12px 18px;
+  width: calc(100% - 44px);
+  max-height: 240px;
+  overflow: auto;
+  box-shadow: 0 5px 18px #0001;
+  margin-bottom: 8px;
+  color: #294732;
+}
+.overlay-caption p {
+  font-size: 17px;
+  line-height: 1.35;
+  margin: 7px 0;
+  animation: phrase-in 380ms ease-out;
+}
+.overlay-greeting {
+  background: #f5dbc2;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 20px;
+  color: #294732;
+}
+
+.overlay-size-controls {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+}
+.overlay-panda:hover .overlay-size-controls,
+.overlay-size-controls:focus-within {
+  opacity: 1;
+}
+.overlay-size-controls button {
+  border: 1px solid #ccd4c9;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  background: #fffaf2;
+  color: #243e30;
+  font-size: 20px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.workshop-stage button {
+  -webkit-app-region: no-drag;
+}
+
+.overlay-size-controls button {
+  padding: 0;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
