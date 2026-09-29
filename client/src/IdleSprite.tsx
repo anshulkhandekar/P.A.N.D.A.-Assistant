@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type CSSProperties } from "react";
 import type { PandaState } from "../../shared/domain";
 import { mascotPose } from "../../shared/animation";
+import type { PandaCustomization } from "./pandaCustomization";
 
 // Fixed body/laptop from one PNG. Only clipped features and the live mouth move.
 export function IdleSprite({
@@ -9,6 +10,7 @@ export function IdleSprite({
   volume,
   greeting = false,
   cutout = false,
+  customization = { glasses: "none" },
   onError,
 }: {
   src: string;
@@ -16,6 +18,7 @@ export function IdleSprite({
   volume: number;
   greeting?: boolean;
   cutout?: boolean;
+  customization?: PandaCustomization;
   onError: () => void;
 }) {
   const id = useId().replace(/:/g, "");
@@ -133,6 +136,49 @@ export function IdleSprite({
       />
     </g>
   );
+  const eyewearTemples =
+    customization.glasses === "none" ? null : (
+      <g
+        className={`panda-glasses-temples panda-glasses-${customization.glasses}`}
+        transform={customization.glasses === "money" ? "translate(-8 0)" : undefined}
+        fill="none"
+        stroke={customization.glasses === "money" ? "#0b4f2b" : "#050505"}
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M155 137 Q148 132 143 127" />
+        <path d="M319 138 Q349 132 377 113" />
+      </g>
+    );
+  const eyewearFront =
+    customization.glasses === "none" ? null : customization.glasses ===
+      "classic" ? (
+      <g
+        className="panda-glasses panda-glasses-classic"
+        fill="#fff"
+        fillOpacity="0.14"
+        stroke="#050505"
+        strokeWidth="7"
+      >
+        <circle cx="190" cy="145" r="35" />
+        <circle cx="284" cy="145" r="35" />
+        <path d="M225 144 Q237 135 249 144" fill="none" />
+      </g>
+    ) : (
+      <g className="panda-glasses panda-glasses-money" transform="translate(-8 0)">
+        <path
+          d="M151 117 Q188 99 226 119 L222 169 Q188 188 153 167 Z M247 119 Q284 99 322 117 L320 167 Q284 188 250 169 Z"
+          fill="#2d9a57"
+          stroke="#0b4f2b"
+          strokeWidth="7"
+          strokeLinejoin="round"
+        />
+        <path d="M225 139 Q237 132 249 139" fill="none" stroke="#0b4f2b" strokeWidth="7" />
+        <text x="188" y="160" textAnchor="middle" fill="#d8ff77" fontFamily="Arial, sans-serif" fontSize="47" fontWeight="900">$</text>
+        <text x="284" y="160" textAnchor="middle" fill="#d8ff77" fontFamily="Arial, sans-serif" fontSize="47" fontWeight="900">$</text>
+      </g>
+    );
   return (
     <svg
       viewBox={cutout ? "38 -4 460 506" : "0 0 512 512"}
@@ -189,6 +235,8 @@ export function IdleSprite({
           <g clipPath={`url(#${id}-toes)`}>{tile(0)}</g>
         </g>
         <g clipPath={`url(#${id}-eyes)`}>{tile(eyeFrame)}</g>
+        {eyewearTemples}
+        {eyewearFront}
         {pose.typing && (
           <g clipPath={`url(#${id}-hands)`}>{tile(reduced ? 0 : hands)}</g>
         )}

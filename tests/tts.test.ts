@@ -25,8 +25,6 @@ it("separates greeting audio caches by selected voice and deduplicates same-voic
   const arrival = {
     eventId: "one",
     firstName: "Jordan",
-    pandaCode: "P1",
-    displayCode: "Panda 1",
     displayName: "Jordan",
   } as Arrival;
   const [first, duplicate] = await Promise.all([

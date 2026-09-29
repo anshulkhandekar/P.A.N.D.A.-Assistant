@@ -3,6 +3,11 @@ import { api } from "./api";
 import { IdleSprite } from "./IdleSprite";
 import { ProjectorRuntime } from "./runtime";
 import { CaptionPacer } from "./captions";
+import {
+  savePandaCustomization,
+  usePandaCustomization,
+  type PandaGlasses,
+} from "./pandaCustomization";
 import "./workshop.css";
 type Snapshot = {
   title: string;
@@ -38,6 +43,7 @@ export function WorkshopConsole() {
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState("gpt-5.6-luna");
   const [search, setSearch] = useState(false);
+  const customization = usePandaCustomization();
   useEffect(() => {
     let live = true;
     const refresh = () =>
@@ -130,6 +136,35 @@ export function WorkshopConsole() {
       </section>
       <section>
         <h2>Panda</h2>
+        <div className="panda-customizer">
+          <div className="panda-customizer-preview" aria-label="Panda customization preview">
+            <IdleSprite
+              src="/assets/panda/typing-blink-v1.png"
+              state="typing"
+              volume={0}
+              customization={customization}
+              onError={() => {}}
+            />
+          </div>
+          <div className="panda-customizer-fields">
+            <label>
+              Glasses
+              <select
+                value={customization.glasses}
+                onChange={(e) =>
+                  savePandaCustomization({
+                    ...customization,
+                    glasses: e.target.value as PandaGlasses,
+                  })
+                }
+              >
+                <option value="none">No glasses</option>
+                <option value="classic">Classic black</option>
+                <option value="money">Green money</option>
+              </select>
+            </label>
+          </div>
+        </div>
         <div className="workshop-actions">
           <button
             onClick={() =>
@@ -351,6 +386,7 @@ export function WorkshopStage() {
   const seen = useRef(new Set<string>());
   const playing = useRef<string | null>(null);
   const captions = useRef(new CaptionPacer());
+  const customization = usePandaCustomization();
   const stage = useRef<HTMLElement>(null);
   const [size, setSize] = useState(() =>
     Math.max(
@@ -516,6 +552,7 @@ export function WorkshopStage() {
           state={speaking ? "speaking" : "typing"}
           volume={r.audio.volume}
           greeting={!!r.greeting}
+          customization={customization}
           onError={() => {}}
         />
       </div>

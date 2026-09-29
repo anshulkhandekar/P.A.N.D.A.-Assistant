@@ -67,6 +67,30 @@
   align-items: center;
   margin: 12px 0;
 }
+.panda-customizer {
+  display: grid;
+  grid-template-columns: 190px minmax(220px, 1fr);
+  gap: 22px;
+  align-items: center;
+  margin: 8px 0 22px;
+  padding: 16px;
+  border: 1px solid #e5e5d8;
+  border-radius: 14px;
+  background: #f8f6ef;
+}
+.panda-customizer-preview {
+  width: 180px;
+  height: 180px;
+  overflow: hidden;
+}
+.panda-customizer-preview svg {
+  width: 100%;
+  height: 100%;
+}
+.panda-customizer-fields {
+  max-width: 320px;
+  width: 100%;
+}
 .question-card {
   border-top: 1px solid #ddd;
   padding: 18px 0;
@@ -165,6 +189,14 @@ html:has(.overlay-body),
   font-size: 20px;
   cursor: pointer;
   -webkit-app-region: no-drag;
+}
+@media (max-width: 620px) {
+  .panda-customizer {
+    grid-template-columns: 1fr;
+  }
+  .panda-customizer-preview {
+    margin: auto;
+  }
 }
 .workshop-stage button {
   -webkit-app-region: no-drag;

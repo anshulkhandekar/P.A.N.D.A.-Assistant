@@ -1,37 +1,36 @@
 import { env, log } from "../config/env.js";
-import {
-  unseenEvents,
-  type MemberProfile,
-  type SignIn,
-  type Arrival,
-} from "../../../shared/domain.js";
-import { MemberCache } from "./MemberCache.js";
-import { GoogleSheetsService } from "./GoogleSheetsService.js";
+import type { Arrival } from "../../../shared/domain.js";
+import type { GoogleSheetsService } from "./GoogleSheetsService.js";
+
 export class SheetPoller {
   seen = new Set<string>();
   lastSync: string | null = null;
   lastError: string | null = null;
+  rowCount = 0;
   private failures = 0;
   private timer?: NodeJS.Timeout;
   private running?: Promise<void>;
   private initialized = false;
+  private stopped = true;
   constructor(
-    private sheets: GoogleSheetsService,
-    private cache: MemberCache,
+    private sheets: Pick<GoogleSheetsService, "snapshot">,
     private onArrival: (a: Arrival) => void,
-    private enrich: (m: MemberProfile) => void,
   ) {}
   start() {
+    if (!this.stopped) return;
+    this.stopped = false;
     const tick = async () => {
       await this.refresh();
-      this.timer = setTimeout(
-        tick,
-        Math.min(60000, env.SHEETS_POLL_INTERVAL_MS * 2 ** this.failures),
-      );
+      if (!this.stopped)
+        this.timer = setTimeout(
+          tick,
+          Math.min(60000, env.SHEETS_POLL_INTERVAL_MS * 2 ** this.failures),
+        );
     };
     void tick();
   }
   stop() {
+    this.stopped = true;
     clearTimeout(this.timer);
   }
   refresh() {
@@ -43,30 +42,16 @@ export class SheetPoller {
   }
   private async sync() {
     try {
-      const [members, events] = await this.sheets.snapshot();
-      for (const m of members) {
-        if (!m.member_id || !m.display_name)
-          throw Error("Members row is missing identity fields");
-        this.cache.upsert(m as MemberProfile);
+      const events = await this.sheets.snapshot();
+      this.rowCount = events.length;
+      for (const arrival of events) {
+        if (this.seen.has(arrival.eventId)) continue;
+        this.seen.add(arrival.eventId);
+        if (this.initialized) this.onArrival(arrival);
       }
-      const fresh = unseenEvents(
-        events as unknown as SignIn[],
-        this.seen,
-        env.SESSION_ID,
-      );
-      for (const e of fresh) {
-        const arrival = this.cache.arrive(e);
-        this.seen.add(e.event_id);
-        if (this.initialized) {
-          log("SIGN_IN_DETECTED", {
-            eventId: e.event_id,
-            pandaCode: arrival.pandaCode,
-          });
-          this.onArrival(arrival);
-        }
-      }
+      // First successful read establishes a baseline: never greet old responses
+      // just because the app restarted or was pointed at an existing sheet.
       this.initialized = true;
-      for (const m of this.cache.membersById.values()) this.enrich(m);
       this.lastSync = new Date().toISOString();
       this.lastError = null;
       this.failures = 0;

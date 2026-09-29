@@ -18,7 +18,6 @@ export class ProjectorRuntime {
     micPaused: false,
     autoGreet: true,
     forcedState: null,
-    activeCode: null,
   };
   state: PandaState = "typing";
   greeting: Arrival | null = null;

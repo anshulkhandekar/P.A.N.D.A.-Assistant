@@ -109,7 +109,7 @@ The connected bot can remain online between workshops while the desktop app runs
 
 ## Workshop routine
 
-1. Launch the app and start a new workshop. This starts greeting mode but does **not** change the Google Sheets session ID or attendance records.
+1. Launch the app and start a new workshop. This starts greeting mode; it does not modify the Form or spreadsheet.
 2. Enable playback on the overlay. Use **Next display** to place it on the projector. Rehearse with the actual slides in fullscreen before the audience arrives; display/Space behavior depends on the presentation setup.
 3. Connect Discord. Register commands only on first setup or after command changes.
 4. Use **Greeting settings** to check live sign-ins and greeting voices. Keep the old projector closed so it does not compete for audio ownership.
@@ -122,24 +122,48 @@ Shortcuts: **⌘⇧P** shows/hides Panda; **⌘⇧O** opens the operator console
 
 Set `OPENAI_API_KEY` for greetings, OpenAI question speech, or private AI drafts. A ChatGPT subscription does not supply API credit. Question speech uses `TTS_MODEL` and `TTS_VOICE`. The optional private draft panel supports model selection and web search; drafts are currently text-only and never posted to Discord. Model access depends on your API account.
 
-Keep `DEMO_MODE=true` for fictional sign-ins. For live greetings, use the existing club workbook:
+## Connect a new workshop Form
 
-### Connecting to the existing club Sheets setup
+Panda reads the normal Google Form response tab directly. It only uses the name and timestamp columns. It does not write to Google, build member profiles, or import previous workshops.
 
-Ask the project owner for the private spreadsheet ID, current session ID, and authorized Google service-account access. The Google Sheets API must be enabled in the service account's Cloud project, and the private workbook must be shared with the service account's email as **Editor**.
+### One-time Google access
 
-Example local configuration (replace these values):
+1. Enable **Google Sheets API** in your Google Cloud project.
+2. Reuse your existing service-account JSON key, or create a service account and download its JSON key. Keep the key outside the repository.
+3. Set `GOOGLE_SERVICE_ACCOUNT_FILE` in your local `.env` to its absolute file path. Keep `OPENAI_API_KEY` configured for spoken greetings.
+
+### For each new workshop
+
+1. Create the Google Form. Include a **required short-answer name question** (a name the attendee is comfortable hearing aloud). Any other questions are fine; their order and number do not matter to Panda.
+2. In the Form's **Responses** tab, choose **Link to Sheets** and create/select a spreadsheet. Submit one test response if necessary to confirm the headers.
+3. Share that spreadsheet with the `client_email` from your service-account JSON as **Viewer**. It does not need Editor access or public sharing.
+4. Copy the spreadsheet ID from `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`. Use the spreadsheet ID, not the Form ID.
+5. Copy the response tab name and the name question's header from row 1. Update your local `.env`:
 
 ```dotenv
 DEMO_MODE=false
 GOOGLE_SERVICE_ACCOUNT_FILE=/absolute/path/to/service-account.json
-PRIVATE_SPREADSHEET_ID=your_private_workbook_id
-SESSION_ID=the_current_session_id
+GREETINGS_SPREADSHEET_ID=your_new_spreadsheet_id
+GREETINGS_SHEET_NAME="Form Responses 1"
+GREETINGS_NAME_HEADER="What's your full name?"
+GREETINGS_TIMESTAMP_HEADER="Timestamp"
 ```
 
-The existing workbook uses `Members`, `SessionSignIns`, and `EnrichmentCache`. The club's Apps Script and Form trigger are already configured: **do not rerun historical imports or reinstall triggers just to run this app on another laptop.** Confirm with the operator that `session_active` is enabled in `Config` before collecting sign-ins. Leave existing session codes and counters alone.
+Use your actual name question, not necessarily the example. Capitalization and punctuation must match. Leading/trailing whitespace and differences in spaces/newlines are normalized. For a localized sheet, map the actual timestamp header too. Both mapped headers must be unique. Questions not mapped here are ignored, including email, prizes, major, and feedback; they do not personalize the greeting automatically.
 
-This assumes access to the club's existing workbook. A separate installation needs its own compatible Sheets/Form setup; simply linking an arbitrary spreadsheet will not work.
+6. Quit the app and any separately running Panda server; run `npm run desktop`. Open **Greeting settings** and wait for Sheets to say **Synced**. A header mismatch or permission error appears there.
+7. Click **Start workshop** and **Enable playback** on Panda. Keep automatic greetings enabled. Submit a **new** Form response after the successful sync. Expect a named greeting in a few seconds; speech needs your OpenAI API key and working audio output.
+8. Click **Start lecture** to stop greetings and use the Discord question queue. Responses still reach Google normally. End the workshop when finished.
+
+### Important behavior
+
+- Every app/server startup silently baselines existing responses. Only submissions detected after the first successful sync greet. Start and verify syncing before attendees sign in; restarting does not replay the old sheet.
+- A test submitted before launch is intentionally silent. Submit again after sync to verify playback. Use **Replay last welcome** to replay the most recent queued greeting.
+- A new submission gets a new greeting even if the person used the same name before. This is response-based, not a member database. Avoid editing names/timestamps or deleting responses during the session; changes to identifying cells may look like new submissions.
+- Rows missing a name or timestamp are skipped. Polling retries temporary failures; submissions added during a temporary outage after the baseline are picked up on recovery.
+- While automatic greetings are off, newly detected responses are skipped rather than queued for a later lecture interruption.
+- No Apps Script, form-submit trigger, repair trigger, private schema, session ID, or historical import is required. If reusing the old spreadsheet, remove its old `onFormSubmit` and `repairLiveSubmissions` triggers in Apps Script → Triggers so the old script stops writing auxiliary data. Removing code locally does not uninstall cloud triggers. Existing Google data is not deleted by this change.
+- Remove obsolete `PRIVATE_*`, `SESSION_ID`, `SESSION_NAME`, `GITHUB_TOKEN`, and `ENABLE_GITHUB_ENRICHMENT` settings from `.env` when convenient. They are no longer used. Keep your Google and OpenAI credentials.
 
 ## Maintenance
 
@@ -147,4 +171,4 @@ This assumes access to the club's existing workbook. A separate installation nee
 - Queue data lives in `.local-data/workshop.sqlite` (excluded from Git). Restart does not erase it. `PANDA_DATA_DIR` can select a different local folder.
 - `.env`, credentials, and local member data must stay private. Never expose this local operator server publicly.
 - The original projector (`/`) and admin (`/admin`) remain available for the earlier voice Q&A workflow.
-- This release keeps the existing Sheets setup. A guided per-workshop Form setup, grouped greetings, installer packaging, and further animation polish are follow-up work.
+- Greetings read a standard Form response tab. Grouped/personalized greetings from extra answers, installer packaging, and further animation polish are follow-up work.

@@ -171,8 +171,6 @@ function Admin({ status }: { status: any }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("Jordan Smith");
-  const [code, setCode] = useState("");
-  const [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false);
   async function run(path: string, body: unknown) {
     setError("");
@@ -216,8 +214,8 @@ function Admin({ status }: { status: any }) {
       <div className="admin-notice">
         Keep this window on your laptop. Only the projector window plays audio.{" "}
         {status?.demo
-          ? "Demo mode uses sample profiles; Google is disconnected."
-          : "Live mode uses your private Google Sheet."}
+          ? "Demo mode uses simulated arrivals; Google is disconnected."
+          : "Live mode reads your Form response sheet."}
       </div>
       <div className="admin-grid">
         <section className="panel">
@@ -352,10 +350,6 @@ function Admin({ status }: { status: any }) {
               <b>{status?.pendingGreetings ?? 0}</b>
               <small>IN THE QUEUE</small>
             </div>
-            <div>
-              <b>{status?.memberCount ?? "—"}</b>
-              <small>MEMBER PROFILES</small>
-            </div>
           </div>
           <dl className="health">
             <dt>Projector</dt>
@@ -380,20 +374,10 @@ function Admin({ status }: { status: any }) {
                       new Date(status.lastSheetsSync).toLocaleTimeString()
                     : "Waiting for first sync")}
             </dd>
-            <dt>GitHub</dt>
-            <dd>
-              {status?.enrichment.enabled
-                ? `${status.enrichment.running} running · ${status.enrichment.pending} queued · ${status.enrichment.complete} complete · ${status.enrichment.failed ?? 0} failed`
-                : "Disabled"}
-            </dd>
-            <dt>GitHub eligibility</dt>
-            <dd>
-              {status?.demo
-                ? "Demo mode does not save enrichment to Sheets"
-                : `${status?.enrichment.eligible ?? 0} eligible · ${status?.enrichment.missingConsent ?? 0} without consent · ${status?.enrichment.invalidUrl ?? 0} consented but missing/invalid URL`}
-            </dd>
-            <dt>Active speaker</dt>
-            <dd>{status?.controls.activeCode || "None selected"}</dd>
+            <dt>Response tab</dt>
+            <dd>{status?.greetingSource?.sheet}</dd>
+            <dt>Name column</dt>
+            <dd>{status?.greetingSource?.nameHeader}</dd>
             <dt>Stage state</dt>
             <dd>{status?.telemetry.state || "Waiting"}</dd>
             <dt>Last voice event</dt>
@@ -420,11 +404,8 @@ function Admin({ status }: { status: any }) {
           {status?.telemetry.error && (
             <p className="warning">{status.telemetry.error}</p>
           )}
-          {status?.enrichment.lastError && (
-            <p className="warning">{status.enrichment.lastError}</p>
-          )}
           <button onClick={() => void action("refresh")}>
-            Refresh Sheets cache ↻
+            Refresh sign-ins
           </button>
         </section>
         <section className="panel">
@@ -437,8 +418,6 @@ function Admin({ status }: { status: any }) {
                 e.preventDefault();
                 void run("/admin/simulateArrival", {
                   name,
-                  pandaCode: code || undefined,
-                  ...(name === "Jordan Smith" ? { memberId: "demo-1" } : {}),
                 });
               }}
             >
@@ -451,22 +430,14 @@ function Admin({ status }: { status: any }) {
                   required
                 />
               </label>
-              <label>
-                Panda code <small>Optional · next available by default</small>
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Panda 1"
-                />
-              </label>
               <button className="primary" disabled={busy}>
                 Simulate arrival ↗
               </button>
             </form>
           ) : (
             <p className="hint">
-              Submit your live Google Form to add a member. Use the attendee
-              controls to greet someone again.
+              Submit your live Google Form after Sheets shows Synced. Use Replay
+              last welcome to greet the last arrival again.
             </p>
           )}
           <div className="mini-note">
@@ -477,36 +448,6 @@ function Admin({ status }: { status: any }) {
           <h2>
             <span>04</span> A helping hand
           </h2>
-          <label>
-            Attendee
-            <select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              <option value="">Choose a Panda number</option>
-              {status?.attendees.map((a: any) => (
-                <option key={a.code} value={a.code}>
-                  Panda {a.code.slice(1)} · {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="button-grid">
-            <button
-              disabled={!selected}
-              onClick={() =>
-                void run("/admin/action", { action: "select", code: selected })
-              }
-            >
-              Select speaker
-            </button>
-            <button
-              disabled={!selected}
-              onClick={() => void run("/admin/greet", { code: selected })}
-            >
-              Greet attendee
-            </button>
-          </div>
           <label>
             Animation rehearsal
             <select
@@ -548,4 +489,12 @@ function Admin({ status }: { status: any }) {
     </main>
   );
 }
-createRoot(document.getElementById("root")!).render(location.pathname === "/workshop" ? <WorkshopConsole /> : location.pathname === "/overlay" ? <WorkshopStage /> : <App />);
+createRoot(document.getElementById("root")!).render(
+  location.pathname === "/workshop" ? (
+    <WorkshopConsole />
+  ) : location.pathname === "/overlay" ? (
+    <WorkshopStage />
+  ) : (
+    <App />
+  ),
+);

@@ -1,82 +1,100 @@
 import { it, expect, vi } from "vitest";
 import { SheetPoller } from "../server/src/services/SheetPoller.js";
-import { MemberCache } from "../server/src/services/MemberCache.js";
-import { EnrichmentQueue } from "../server/src/services/EnrichmentQueue.js";
-import { env } from "../server/src/config/env.js";
-import type { GoogleSheetsService } from "../server/src/services/GoogleSheetsService.js";
-import type { MemberProfile } from "../shared/domain.js";
-const m = {
-  member_id: "m",
-  email_normalized: "",
-  display_name: "Jordan",
-  first_name: "Jordan",
-  github_enrichment_consent: "false",
-  github_url: "https://github.com/octocat",
-} as MemberProfile;
+import { parseSignIns } from "../server/src/services/GoogleSheetsService.js";
 const row = (n: number) => ({
-  event_id: "e" + n,
-  session_id: env.SESSION_ID,
-  session_sequence: String(n),
-  panda_code: "P" + n,
-  member_id: "m",
+  eventId: `e${n}`,
+  displayName: "Jordan",
+  firstName: "Jordan",
 });
-it("loads initial history silently, emits every new row sorted, and survives API errors", async () => {
-  let events = [row(1)];
-  let fail = false;
-  const sheets = {
-    snapshot: vi.fn(async () => {
-      if (fail) throw Error("offline");
-      return [[m], events];
-    }),
-  } as unknown as GoogleSheetsService;
-  const cache = new MemberCache();
+it("baselines existing responses, emits new sign-ins once, and recovers from errors", async () => {
+  let events = [row(1)],
+    fail = false;
+  const snapshot = vi.fn(async () => {
+    if (fail) throw Error("offline");
+    return events;
+  });
   const emit = vi.fn();
-  const poller = new SheetPoller(sheets, cache, emit, () => {});
+  const poller = new SheetPoller({ snapshot }, emit);
   await poller.refresh();
   expect(emit).not.toHaveBeenCalled();
-  events = [row(1), row(3), row(2)];
+  events = [row(1), row(2), row(3)];
   await poller.refresh();
-  expect(emit.mock.calls.map((c) => c[0].pandaCode)).toEqual(["P2", "P3"]);
+  expect(emit.mock.calls.map((c) => c[0].eventId)).toEqual(["e2", "e3"]);
+  events.reverse();
   await poller.refresh();
   expect(emit).toHaveBeenCalledTimes(2);
   fail = true;
   await poller.refresh();
-  expect(cache.getMemberContext("P2")?.name).toBe("Jordan");
   expect(poller.lastError).toBe("offline");
   fail = false;
   events.push(row(4));
   await poller.refresh();
   expect(emit).toHaveBeenCalledTimes(3);
   expect(poller.lastError).toBeNull();
+  expect(poller.rowCount).toBe(4);
 });
-it("does not overlap concurrent refreshes", async () => {
+it("does not baseline a failed read or overlap concurrent refreshes", async () => {
   let release!: (value: any) => void;
   const snapshot = vi.fn(
     () =>
-      new Promise((resolve) => {
+      new Promise<any>((resolve) => {
         release = resolve;
       }),
   );
-  const poller = new SheetPoller(
-    { snapshot } as unknown as GoogleSheetsService,
-    new MemberCache(),
-    () => {},
-    () => {},
-  );
-  const first = poller.refresh();
-  const second = poller.refresh();
+  const emit = vi.fn();
+  const poller = new SheetPoller({ snapshot }, emit);
+  const first = poller.refresh(),
+    second = poller.refresh();
   expect(snapshot).toHaveBeenCalledTimes(1);
-  release([[m], []]);
+  release([row(1)]);
   await Promise.all([first, second]);
+  expect(emit).not.toHaveBeenCalled();
 });
-it("consent=false does not queue or fetch public GitHub data", () => {
-  const fetchSpy = vi.spyOn(globalThis, "fetch");
-  const cache = new MemberCache();
-  cache.upsert(m);
-  const queue = new EnrichmentQueue(cache);
-  queue.enqueue(m);
-  expect(queue.status.running).toBe(0);
-  expect(queue.status.pending).toBe(0);
-  expect(fetchSpy).not.toHaveBeenCalled();
-  fetchSpy.mockRestore();
+it("maps reordered multiline headers and excludes every unrelated answer", () => {
+  const parsed = parseSignIns(
+    [
+      ["Prize choice", "What's your\n name?", "Timestamp", "Email Address"],
+      ["secret", "Anshul K", "time", "private@example.com"],
+    ],
+    "What's your name?",
+    "Timestamp",
+  );
+  expect(parsed[0]).toMatchObject({
+    displayName: "Anshul K",
+    firstName: "Anshul",
+  });
+  expect(JSON.stringify(parsed)).not.toMatch(/secret|private@example/);
+  const edited = parseSignIns(
+    [
+      ["Timestamp", "What's your name?"],
+      ["time", "Anshul K"],
+    ],
+    "What's your name?",
+    "Timestamp",
+  );
+  expect(edited).toEqual(parsed);
+});
+it("requires unambiguous configured headers, skips incomplete rows, and preserves identical submissions", () => {
+  expect(() =>
+    parseSignIns([["Timestamp", "Full name"]], "Name", "Timestamp"),
+  ).toThrow("Missing response header: Name");
+  expect(() =>
+    parseSignIns([["Timestamp", "Name", "Name"]], "Name", "Timestamp"),
+  ).toThrow("Duplicate");
+  expect(() => parseSignIns([["Name"]], "Name", "Name")).toThrow(
+    "different columns",
+  );
+  const parsed = parseSignIns(
+    [
+      ["Name", "Timestamp"],
+      ["", "time"],
+      ["Jordan", ""],
+      ["Jordan", "same"],
+      ["Jordan", "same"],
+    ],
+    "Name",
+    "Timestamp",
+  );
+  expect(parsed).toHaveLength(2);
+  expect(parsed[0].eventId).not.toBe(parsed[1].eventId);
 });

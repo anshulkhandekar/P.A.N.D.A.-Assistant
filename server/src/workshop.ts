@@ -264,7 +264,7 @@ export function workshopRouter(setPhase: (phase: string) => void) {
       model: b.model,
       instructions:
         personality +
-        "\nThis is a private typed question. Do not ask for a Panda code or claim to know the asker. Answer the supplied question directly.",
+        "\nThis is a private typed question. Do not claim to know the asker. Answer the supplied question directly.",
       input: b.question,
       max_output_tokens: 600,
       ...(b.search ? { tools: [{ type: "web_search" as const }] } : {}),

@@ -1,15 +1,21 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 const port = 3037;
+const dataDir = await mkdtemp(join(tmpdir(), "panda-smoke-"));
 const child = spawn(process.execPath, ["dist/server/src/index.js"], {
   env: {
     ...process.env,
     PORT: String(port),
     DEMO_MODE: "true",
     OPENAI_API_KEY: "",
-    ENABLE_GITHUB_ENRICHMENT: "false",
+    ENABLE_DISCORD_QA: "false",
+    ENABLE_AUTO_GREET: "true",
+    PANDA_DATA_DIR: dataDir,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -36,7 +42,7 @@ try {
   ]);
   const status = await (await request("/status")).json();
   assert.equal(status.demo, true);
-  assert.equal(status.memberCount, 3);
+  assert.equal(status.attendeeCount, 0);
   assert.equal(status.openaiConfigured, false);
   const abort = new AbortController();
   const stream = await fetch(base + "/events", { signal: abort.signal });
@@ -62,7 +68,7 @@ try {
       return r.json();
     }),
   );
-  assert.equal(new Set(rows.map((r) => r.pandaCode)).size, 10);
+  assert.equal(new Set(rows.map((r) => r.eventId)).size, 10);
   await new Promise((resolve) => setTimeout(resolve, 150));
   assert.equal((output.match(/event: member_arrived/g) || []).length, 10);
   abort.abort();
@@ -85,16 +91,6 @@ try {
     403,
   );
   assert.equal(
-    (await request("/admin/action", { action: "select", code: "Panda 99" }))
-      .status,
-    404,
-  );
-  assert.equal(
-    (await request("/admin/action", { action: "select", code: "Panda 1" }))
-      .status,
-    200,
-  );
-  assert.equal(
     (await request("/greeting/" + rows[0].eventId + "/audio")).status,
     502,
   );
@@ -114,12 +110,12 @@ try {
   );
   const final = await (await request("/status")).json();
   assert.equal(final.attendeeCount, 10);
-  assert.equal(final.controls.activeCode, "P1");
   assert.equal(JSON.stringify(final).includes("email_normalized"), false);
   console.log(
-    "PASS: HTTP startup, 10 arrivals, SSE delivery, single audio lease, unknown code, privacy, origin/input validation, missing-key fallback, and acknowledgement.",
+    "PASS: HTTP startup, 10 arrivals, SSE delivery, single audio lease, privacy, origin/input validation, missing-key fallback, and acknowledgement.",
   );
 } finally {
   child.kill("SIGTERM");
   await once(child, "exit");
+  await rm(dataDir, { recursive: true, force: true });
 }

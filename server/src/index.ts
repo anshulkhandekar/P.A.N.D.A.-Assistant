@@ -5,10 +5,8 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { env, log } from "./config/env.js";
-import { MemberCache } from "./services/MemberCache.js";
 import { GoogleSheetsService } from "./services/GoogleSheetsService.js";
 import { SheetPoller } from "./services/SheetPoller.js";
-import { EnrichmentQueue } from "./services/EnrichmentQueue.js";
 import { TTSService } from "./services/OpenAIService.js";
 import { OpenAIRealtimeService } from "./services/OpenAIRealtimeService.js";
 import {
@@ -16,13 +14,7 @@ import {
   TTS_VOICES,
   greetingVoices,
 } from "../../shared/voices.js";
-import {
-  normalizePandaCode,
-  type MemberProfile,
-  type SignIn,
-  type Arrival,
-  type Controls,
-} from "../../shared/domain.js";
+import { type Arrival, type Controls } from "../../shared/domain.js";
 export const app = express();
 app.disable("x-powered-by");
 // This application is a local operator console, never an attendee-facing server.
@@ -55,9 +47,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "32kb" }));
-const cache = new MemberCache();
 const sheets = env.DEMO_MODE ? undefined : new GoogleSheetsService();
-const enrichment = new EnrichmentQueue(cache, sheets);
 const tts = new TTSService();
 let controls: Controls = {
   greetingVoice: env.TTS_VOICE,
@@ -67,7 +57,6 @@ let controls: Controls = {
   micPaused: false,
   autoGreet: env.ENABLE_AUTO_GREET,
   forcedState: null,
-  activeCode: null,
 };
 const clients = new Set<express.Response>();
 const arrivals = new Map<string, Arrival>();
@@ -90,23 +79,16 @@ function emit(type: string, data: unknown) {
   for (const res of clients)
     res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
 }
-const realtime = new OpenAIRealtimeService(cache, emit, (code) => {
-  controls.activeCode = code;
-  emit("controls", controls);
-});
+const realtime = new OpenAIRealtimeService(emit);
 function enqueue(a: Arrival) {
+  if (!controls.autoGreet) return;
   arrivals.set(a.eventId, a);
   pending.add(a.eventId);
   latest = a;
   log("GREETING_QUEUED", { eventId: a.eventId });
   emit("member_arrived", a);
 }
-let enrichmentReady = env.DEMO_MODE;
-const poller = sheets
-  ? new SheetPoller(sheets, cache, enqueue, (m) => {
-      if (enrichmentReady) enrichment.enqueue(m);
-    })
-  : null;
+const poller = sheets ? new SheetPoller(sheets, enqueue) : null;
 function state() {
   return {
     controls,
@@ -114,23 +96,20 @@ function state() {
       greeting: greetingVoices(env.TTS_MODEL),
       response: REALTIME_VOICES,
     },
-    sessionId: env.SESSION_ID,
-    sessionName: env.SESSION_NAME,
     demo: env.DEMO_MODE,
     openaiConfigured: !!env.OPENAI_API_KEY,
-    memberCount: cache.membersById.size,
-    attendeeCount: cache.membersByPandaCode.size,
+    attendeeCount: poller?.rowCount ?? arrivals.size,
+    greetingSource: {
+      sheet: env.GREETINGS_SHEET_NAME,
+      nameHeader: env.GREETINGS_NAME_HEADER,
+      timestampHeader: env.GREETINGS_TIMESTAMP_HEADER,
+    },
     pendingGreetings: pending.size,
     lastSheetsSync: poller?.lastSync ?? null,
     sheetsError: poller?.lastError ?? null,
-    enrichment: enrichment.status,
     voice: realtime.status,
     projectorConnected: !!owner && owner.until > Date.now(),
     telemetry,
-    attendees: [...cache.membersByPandaCode].map(([code, id]) => ({
-      code,
-      name: cache.membersById.get(id)?.display_name,
-    })),
   };
 }
 app.get("/api/status", (_req, res) => res.json(state()));
@@ -249,28 +228,24 @@ app.post("/api/controls", async (req, res) => {
     patch.greetingVoice &&
     !greetingVoices(env.TTS_MODEL).includes(patch.greetingVoice)
   )
-    return res
-      .status(400)
-      .json({
-        error: "This voice is not supported by the configured greeting model",
-      });
+    return res.status(400).json({
+      error: "This voice is not supported by the configured greeting model",
+    });
   controls = { ...controls, ...patch };
   if (patch.mode === "arrival") await realtime.disconnect();
   emit("controls", controls);
   res.json(controls);
 });
 app.post("/api/admin/action", async (req, res) => {
-  const { action, code } = z
+  const { action } = z
     .object({
       action: z.enum([
         "clear",
         "replay",
         "reconnect",
         "refresh",
-        "select",
         "end_exchange",
       ]),
-      code: z.string().max(60).optional(),
     })
     .parse(req.body);
   if (action === "clear") {
@@ -285,12 +260,6 @@ app.post("/api/admin/action", async (req, res) => {
     emit("command", { action: "reconnect" });
   }
   if (action === "refresh") await poller?.refresh();
-  if (action === "select") {
-    const normalized = normalizePandaCode(code || "");
-    if (!normalized || !cache.getMemberContext(normalized))
-      return res.status(404).json({ error: "Unknown Panda code" });
-    await realtime.select(normalized);
-  }
   res.json({ ok: true });
 });
 app.post("/api/admin/simulateArrival", (req, res) => {
@@ -298,65 +267,16 @@ app.post("/api/admin/simulateArrival", (req, res) => {
     return res
       .status(403)
       .json({ error: "Simulation is enabled only in DEMO_MODE" });
-  const input = z
-    .object({
-      name: z.string().trim().min(1).max(80),
-      pandaCode: z.string().max(60).optional(),
-      memberId: z.string().max(80).optional(),
-    })
+  const { name } = z
+    .object({ name: z.string().trim().min(1).max(80) })
     .parse(req.body);
-  const code = normalizePandaCode(
-    input.pandaCode ||
-      Array.from({ length: 100 }, (_, i) => "P" + (i + 1)).find(
-        (c) => !cache.membersByPandaCode.has(c),
-      ) ||
-      "invalid",
-  );
-  if (!code || cache.membersByPandaCode.has(code))
-    return res
-      .status(400)
-      .json({ error: "Use a free Panda code from 1 to 100" });
-  const memberId = input.memberId || randomUUID();
-  const existing = cache.membersById.get(memberId);
-  cache.upsert(
-    existing || {
-      member_id: memberId,
-      email_normalized: "",
-      display_name: input.name,
-      first_name: input.name.split(" ")[0],
-      github_url: "",
-      github_enrichment_consent: "false",
-      major: "Computer Science",
-      career_interest: "AI / ML",
-      current_goal: "Build a first deployed project",
-      experience_level: "Intermediate",
-    },
-  );
-  const a = cache.arrive({
-    event_id: randomUUID(),
-    session_id: env.SESSION_ID,
-    session_sequence: code.slice(1),
-    panda_code: code,
-    member_id: memberId,
-    display_name: input.name,
-  } as SignIn);
+  const a: Arrival = {
+    eventId: randomUUID(),
+    displayName: name,
+    firstName: name.split(/\s+/)[0],
+  };
   enqueue(a);
   res.json(a);
-});
-app.post("/api/admin/greet", (req, res) => {
-  const { code } = z.object({ code: z.string().max(60) }).parse(req.body);
-  const normalized = normalizePandaCode(code);
-  const id = normalized && cache.membersByPandaCode.get(normalized);
-  if (!id) return res.status(404).json({ error: "Unknown Panda code" });
-  const m = cache.membersById.get(id)!;
-  enqueue({
-    eventId: randomUUID(),
-    pandaCode: normalized!,
-    displayCode: `Panda ${normalized!.slice(1)}`,
-    displayName: m.display_name,
-    firstName: m.first_name,
-  });
-  res.json({ ok: true });
 });
 app.post("/api/realtime/session", requireOwner, async (req, res) => {
   if (controls.mode !== "qa")
@@ -370,12 +290,23 @@ app.post("/api/realtime/disconnect", requireOwner, async (_req, res) => {
   await realtime.disconnect();
   res.json({ ok: true });
 });
-app.use("/api/workshop", workshopRouter((phase) => {
-  controls = {...controls, mode: "arrival", micPaused: true, autoGreet: phase === "arrivals"};
-  if (phase !== "arrivals") { pending.clear(); emit("command", {action:"clear"}); }
-  void realtime.disconnect();
-  emit("controls", controls);
-}));
+app.use(
+  "/api/workshop",
+  workshopRouter((phase) => {
+    controls = {
+      ...controls,
+      mode: "arrival",
+      micPaused: true,
+      autoGreet: phase === "arrivals",
+    };
+    if (phase !== "arrivals") {
+      pending.clear();
+      emit("command", { action: "clear" });
+    }
+    void realtime.disconnect();
+    emit("controls", controls);
+  }),
+);
 app.use("/api", (_req, res) =>
   res.status(404).json({ error: "API route not found" }),
 );
@@ -402,28 +333,8 @@ app.use(
   },
 );
 async function start() {
-  if (env.DEMO_MODE) {
-    for (const [i, name] of [
-      "Jordan Smith",
-      "Alex Rivera",
-      "Sam Chen",
-    ].entries())
-      cache.upsert({
-        member_id: "demo-" + (i + 1),
-        email_normalized: "",
-        display_name: name,
-        first_name: name.split(" ")[0],
-        github_url: "",
-        github_enrichment_consent: "false",
-        major: "Computer Science",
-        career_interest: i === 0 ? "AI / ML" : "Data engineering",
-        current_goal: "Land a first technical internship",
-        experience_level: "Intermediate",
-      } as MemberProfile);
-  } else if (poller) {
+  if (poller) {
     await poller.refresh();
-    await enrichment.hydrate();
-    enrichmentReady = true;
     poller.start();
   }
   const server = app.listen(env.PORT, "127.0.0.1", () =>

@@ -2,22 +2,8 @@ import WebSocket from "ws";
 import { z } from "zod";
 import { env, log } from "../config/env.js";
 import { personality } from "../config/personality.js";
-import { MemberCache } from "./MemberCache.js";
 import { searchCurrentInformation } from "./OpenAIService.js";
-import { normalizePandaCode } from "../../../shared/domain.js";
 const tools = [
-  {
-    type: "function",
-    name: "lookup_member",
-    description:
-      "Resolve an explicitly spoken Panda code to the active member. Ask for clarification when uncertain.",
-    parameters: {
-      type: "object",
-      properties: { panda_code: { type: "string" } },
-      required: ["panda_code"],
-      additionalProperties: false,
-    },
-  },
   {
     type: "function",
     name: "search_current_information",
@@ -34,15 +20,10 @@ const tools = [
 export class OpenAIRealtimeService {
   private ws?: WebSocket;
   private callId?: string;
-  private memberItems = new Set<string>();
   private handled = new Set<string>();
   private generation = 0;
   status = "disconnected";
-  constructor(
-    private cache: MemberCache,
-    private emit: (type: string, data: unknown) => void,
-    private onCode: (code: string | null) => void,
-  ) {}
+  constructor(private emit: (type: string, data: unknown) => void) {}
   async connect(sdp: string, voice = env.REALTIME_VOICE) {
     await this.disconnect();
     if (!env.OPENAI_API_KEY) throw Error("OPENAI_API_KEY is not configured");
@@ -150,34 +131,6 @@ export class OpenAIRealtimeService {
     if (this.ws?.readyState === WebSocket.OPEN)
       this.ws.send(JSON.stringify(event));
   }
-  async select(code: string) {
-    const normalized = normalizePandaCode(code);
-    const context = normalized && this.cache.getMemberContext(normalized);
-    if (!context) throw Error("Unknown Panda code");
-    this.clearMemberItems();
-    this.onCode(normalized);
-    const id = "operator_" + Date.now();
-    this.memberItems.add(id);
-    this.send({
-      type: "conversation.item.create",
-      item: {
-        id,
-        type: "message",
-        role: "system",
-        content: [
-          {
-            type: "input_text",
-            text: `Operator selected active attendee ${normalized}. Use only this profile as data: ${JSON.stringify(context)}`,
-          },
-        ],
-      },
-    });
-  }
-  private clearMemberItems() {
-    for (const item_id of this.memberItems)
-      this.send({ type: "conversation.item.delete", item_id });
-    this.memberItems.clear();
-  }
   private async event(e: Record<string, any>) {
     if (e.type === "error") {
       this.emit("voice_error", {
@@ -210,23 +163,7 @@ export class OpenAIRealtimeService {
     });
     try {
       const args = JSON.parse(e.arguments);
-      if (e.name === "lookup_member") {
-        const parsed = z
-          .object({ panda_code: z.string().max(60) })
-          .strict()
-          .parse(args);
-        const code = normalizePandaCode(parsed.panda_code);
-        this.clearMemberItems();
-        const context = code ? this.cache.getMemberContext(code) : null;
-        this.onCode(context ? code : null);
-        result = context
-          ? { activePandaCode: code, profile: context }
-          : {
-              error:
-                "Unknown or ambiguous code. Clear prior identity; ask the speaker to repeat their Panda code.",
-            };
-        log("MEMBER_LOOKUP", { pandaCode: code, found: !!context });
-      } else if (e.name === "search_current_information") {
+      if (e.name === "search_current_information") {
         const parsed = z
           .object({ query: z.string().min(3).max(400) })
           .strict()
@@ -234,13 +171,8 @@ export class OpenAIRealtimeService {
         result = await searchCurrentInformation(parsed.query);
       } else result = { error: "Unknown tool" };
     } catch {
-      if (e.name === "lookup_member") {
-        this.clearMemberItems();
-        this.onCode(null);
-      }
       result = {
-        error:
-          "Invalid tool input. Clear any prior identity and ask the attendee to clarify.",
+        error: "Invalid tool input. Ask the attendee to clarify.",
       };
     }
     if (generation !== this.generation) return;
@@ -254,7 +186,6 @@ export class OpenAIRealtimeService {
         output: JSON.stringify(result),
       },
     });
-    if (e.name === "lookup_member") this.memberItems.add(id);
   }
   private async hangup(id: string) {
     try {
@@ -276,10 +207,8 @@ export class OpenAIRealtimeService {
     this.callId = undefined;
     this.ws?.close();
     this.ws = undefined;
-    this.memberItems.clear();
     this.handled.clear();
     this.status = "disconnected";
-    this.onCode(null);
     if (id) await this.hangup(id);
   }
 }
