@@ -140,7 +140,9 @@ export function IdleSprite({
     customization.glasses === "none" ? null : (
       <g
         className={`panda-glasses-temples panda-glasses-${customization.glasses}`}
-        transform={customization.glasses === "money" ? "translate(-8 0)" : undefined}
+        transform={
+          customization.glasses === "money" ? "translate(-8 0)" : undefined
+        }
         fill="none"
         stroke={customization.glasses === "money" ? "#0b4f2b" : "#050505"}
         strokeWidth="7"
@@ -166,7 +168,10 @@ export function IdleSprite({
         <path d="M225 144 Q237 135 249 144" fill="none" />
       </g>
     ) : (
-      <g className="panda-glasses panda-glasses-money" transform="translate(-8 0)">
+      <g
+        className="panda-glasses panda-glasses-money"
+        transform="translate(-8 0)"
+      >
         <path
           d="M151 117 Q188 99 226 119 L222 169 Q188 188 153 167 Z M247 119 Q284 99 322 117 L320 167 Q284 188 250 169 Z"
           fill="#2d9a57"
@@ -174,9 +179,34 @@ export function IdleSprite({
           strokeWidth="7"
           strokeLinejoin="round"
         />
-        <path d="M225 139 Q237 132 249 139" fill="none" stroke="#0b4f2b" strokeWidth="7" />
-        <text x="188" y="160" textAnchor="middle" fill="#d8ff77" fontFamily="Arial, sans-serif" fontSize="47" fontWeight="900">$</text>
-        <text x="284" y="160" textAnchor="middle" fill="#d8ff77" fontFamily="Arial, sans-serif" fontSize="47" fontWeight="900">$</text>
+        <path
+          d="M225 139 Q237 132 249 139"
+          fill="none"
+          stroke="#0b4f2b"
+          strokeWidth="7"
+        />
+        <text
+          x="188"
+          y="160"
+          textAnchor="middle"
+          fill="#d8ff77"
+          fontFamily="Arial, sans-serif"
+          fontSize="47"
+          fontWeight="900"
+        >
+          $
+        </text>
+        <text
+          x="284"
+          y="160"
+          textAnchor="middle"
+          fill="#d8ff77"
+          fontFamily="Arial, sans-serif"
+          fontSize="47"
+          fontWeight="900"
+        >
+          $
+        </text>
       </g>
     );
   return (

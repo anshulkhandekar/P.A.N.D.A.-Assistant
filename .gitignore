@@ -9,11 +9,15 @@ credentials/
 coverage/
 artifacts/
 
-# Local notes and documentation (keep on disk, out of the code repository)
+# Local notes (publish only the curated documentation below)
 *.md
 *.markdown
 !/README.md
-docs/
+docs/*
+!docs/SETUP.md
+!docs/ARCHITECTURE.md
+!docs/DEVELOPMENT.md
+!docs/SECURITY.md
 
 # Private keys, credentials, and local exports
 secrets/

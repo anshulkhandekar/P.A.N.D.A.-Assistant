@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.local-data/
+.env*
+package-lock.json
+handoff.md
+docs/*
+!docs/SETUP.md
+!docs/ARCHITECTURE.md
+!docs/DEVELOPMENT.md
+!docs/SECURITY.md
+client/public/
+coverage/
+artifacts/
+.codex/
+.agents/
