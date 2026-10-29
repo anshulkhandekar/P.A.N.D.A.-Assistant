@@ -5,7 +5,6 @@
   <p>Electron · React · TypeScript · Discord · SQLite · Google Sheets · OpenAI</p>
 </div>
 
-
 ![P.A.N.D.A. Assistant in action](client/public/assets/panda/panda-assistant.gif)
 
 Built for the Aggie Data Science Club, P.A.N.D.A. turns Discord questions into a moderated, presenter-controlled queue. An animated desktop panda reads approved questions aloud between teaching segments and welcomes attendees as they sign in through Google Forms.
